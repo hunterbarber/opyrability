@@ -695,28 +695,28 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
     '''
     Inverse mapping for Process Operability calculations. From a Desired Output
     Set (DOS) defined by the user, this function calculates the closest
-    Feasible Desired Ouput set (DOS*) from the AOS and its respective Feasible
+    Feasible Desired Output set (DOS*) from the AOS and its respective Feasible
     Desired Input Set (DIS*), which gives insight about potential changes in
     design and/or operations of a given process model.
-    
+
     This function is part of Python-based Process Operability package.
-    
-    Control, Optimization and Design for Energy and Sustainability (CODES) 
+
+    Control, Optimization and Design for Energy and Sustainability (CODES)
     Group - West Virginia University - 2023
-    
+
     Author: Victor Alves
 
     Parameters
     ----------
     model : Callable[...,Union[float,np.ndarray]]
-        Process model that calculates the relationship from inputs (AIS-DIS) 
+        Process model that calculates the relationship from inputs (AIS-DIS)
         to outputs (AOS-DOS).
     DOS_bounds : np.ndarray
-        Array containing the bounds of the Desired Output set (DOS). Each row 
+        Array containing the bounds of the Desired Output set (DOS). Each row
         corresponds to the lower and upper bound of each variable.
     DOS_resolution: np.ndarray
         Array containing the resolution of the discretization grid for the DOS.
-        Each element corresponds to the resolution of each variable. For a 
+        Each element corresponds to the resolution of each variable. For a
         resolution defined as k, it will generate d^k points (in which d is the
         dimensionality of the problem).
     u0 : np.ndarray
@@ -730,32 +730,32 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
         List of functions containing constraints to the inverse mapping.
         The default is None. follows scipy.optimize synthax.
     method: str
-        Optimization method used. The default is DE 
-        (Differential evolution from scipy). Set 'ipopt' if CyIpopt is 
+        Optimization method used. The default is DE
+        (Differential evolution from scipy). Set 'ipopt' if CyIpopt is
         installed and want to use gradient-based solver. Options are:
             For unconstrained problems:
-                
+
                 -'trust-constr'
-                
+
                 -'Nelder-Mead'
-                
+
                 -'ipopt'
-                
+
                 -'DE'
-                
+
             For constrained problems:
-                
+
                 -'ipopt'
-                
+
                 -'DE'
-                
+
                 -'SLSQP'
     plot: bool
         Turn on/off plot. If dimension is d<=3, plot is available and
         both the Feasible Desired Output Set (DOS*) and Feasible Desired Input
         Set (DIS*) are plotted. Default is True.
     ad: bool
-       Turn on/off use of Automatic Differentiation using JAX. If Jax is 
+       Turn on/off use of Automatic Differentiation using JAX. If Jax is
        installed, high-order data (jacobians, hessians) are obtained using AD.
        Default is False.
     warmstart: bool
@@ -764,8 +764,8 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
         True.
     labels: str, Optional.
         labels for axes. Accepts TeX math input as it uses matplotlib math
-        rendering. Should be in order u1,u2,u3, y1, y2, y3, and so on: 
-        labels= ['first u label','second u label', 'first y label', 'second y label']. 
+        rendering. Should be in order u1,u2,u3, y1, y2, y3, and so on:
+        labels= ['first u label','second u label', 'first y label', 'second y label'].
         Default is False.
 
     Returns
@@ -780,22 +780,22 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
     message_list: list
         List containing the termination criteria for each optimization run
         performed for each DOS grid point.
-        
+
     References
     ----------
-    [1] J. C. Carrasco and F. V. Lima, “An optimization-based operability 
-    framework for process design and intensification of modular natural 
-    gas utilization systems,” Comput. & Chem. Eng, 2017. 
+    [1] J. C. Carrasco and F. V. Lima, “An optimization-based operability
+    framework for process design and intensification of modular natural
+    gas utilization systems,” Comput. & Chem. Eng, 2017.
     https://doi.org/10.1016/j.compchemeng.2016.12.010
 
     '''
-    
-    
+
+
     from scipy.optimize import NonlinearConstraint
     # Use JAX.numpy if differentiable programming is available.
     if ad is False:
         import numpy as np
-        
+
         def p1(u: np.ndarray,
                model: Callable[..., Union[float, np.ndarray]],
                DOSpt: np.ndarray):
@@ -810,7 +810,7 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
         # Error minimization function
         def error(y_achieved, y_desired):
             return ((y_achieved-y_desired)/y_desired)**2
-        
+
     else:
         print(" You have selected automatic differentiation as a method for"
        " obtaining higher-order data (Jacobians/Hessian),")
@@ -821,13 +821,13 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
         warnings.filterwarnings('ignore', module='jax._src.lib.xla_bridge')
         import jax.numpy as np
         from jax import jacrev, grad
-        
+
         # Make sure that the arrays contain floats (Reviewer #2 bug @ JOSS)
         u0 = u0.astype(np.float64)
         lb = lb.astype(np.float64)
         ub = ub.astype(np.float64)
         DOS_bounds = DOS_bounds.astype(np.float64)
-        
+
         def p1(u: np.ndarray,
                model: Callable[..., Union[float, np.ndarray]],
                DOSpt: np.ndarray):
@@ -840,36 +840,36 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
             return f
 
         # Error minimization function
-        
+
         def error(y_achieved, y_desired):
             return ((y_achieved-y_desired)/y_desired)**2
-        
+
         # Take gradient and hessian of Objective function
         grad_ad = grad(p1)
         # hess_ad = jacrev(grad_ad)
-        # BUG: AD-based hessians are deactivated in ipopt for now due to 
+        # BUG: AD-based hessians are deactivated in ipopt for now due to
         # Cyipopt`s bug.
         # https://github.com/mechmotum/cyipopt/issues/175
         # https://github.com/mechmotum/cyipopt/pull/176
-        
+
         if constr is not None:
             constr['jac']  = (jacrev(constr['fun']))
             # constr['fun'] = jit(constr['fun'])
-            # BUG: AD-based hessians are deactivated for in ipopt now 
+            # BUG: AD-based hessians are deactivated for in ipopt now
             # due to Cyipopt`s bug.
             # https://github.com/mechmotum/cyipopt/issues/175
             # https://github.com/mechmotum/cyipopt/pull/176
-            
+
             # constr['hess'] = jit(jacrev(jacrev(constr['fun'])))
         else:
             pass
 
-            
+
     if not isinstance(DOS_bounds, np.ndarray):
         DOS_bounds = np.array(DOS_bounds)
     else:
         pass
-    
+
     dimDOS = DOS_bounds.shape[0]
     DOSPts = create_grid(DOS_bounds, DOS_resolution)
     DOSPts = DOSPts.reshape(-1, dimDOS)
@@ -902,9 +902,9 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
 
     # Inverse-mapping: Run for each DOS grid point
     for i in tqdm(range(r)):
-        
+
         if constr is None:
-            
+
             if ad is True:
                 if method == 'trust-constr':
                     sol = sp.optimize.minimize(p1, x0=u0, bounds=bounds,
@@ -955,9 +955,9 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     sol = DE(p1, bounds=bounds, x0=u0, strategy='best1bin',
                              maxiter=2000, workers=-1, updating='deferred',
                              init='sobol', args=(model, DOSPts[i, :]))
-                
 
-            
+
+
 
         else:
             if method == 'ipopt':
@@ -986,20 +986,20 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                                               hess=(jacrev(jacrev(con_fun))))
                     sol = sp.optimize.minimize(p1, x0=u0, bounds=bounds,
                                                args=(model, DOSPts[i, :]),
-                                               method=method, 
+                                               method=method,
                                                constraints=(nlc),
                                                jac=grad_ad)
                                                # , hess=hess_ad)
                 else:
                     sol = sp.optimize.minimize(p1, x0=u0, bounds=bounds,
                                                args=(model, DOSPts[i, :]),
-                                               method=method, 
+                                               method=method,
                                                constraints=(nlc))
 
-        
-        
+
+
         # Append results into fDOS, fDIS and message list for each iteration
-        
+
         if warmstart is True:
             if sol.success is True:
                 u0 = sol.x
@@ -1007,8 +1007,8 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                 u0 = u00 # Reboot to first initial estimate
         else:
             u0 = u00 # Reboot to first initial estimate
-            
-        
+
+
         if ad is True:
             fDOS = fDOS.at[i, :].set(model(sol.x))
             fDIS = fDIS.at[i, :].set(sol.x)
@@ -1018,8 +1018,8 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
             fDIS[i, :] = sol.x
 
         message_list.append(sol.message)
-    
-    
+
+
     if fDIS.shape[1] > 3 and fDOS.shape[1] > 3:
         plot is False
         print('plot not supported. Dimension higher than 3.')
@@ -1028,45 +1028,45 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
         if plot is False:
             pass
         elif plot is True:
-            
+
             if fDIS.shape[1] == 2 and fDOS.shape[1] == 2:
-                _, (ax1, ax2) = plt.subplots(nrows=1,ncols=2, 
+                _, (ax1, ax2) = plt.subplots(nrows=1,ncols=2,
                                               constrained_layout=True)
                 ax1.scatter(fDIS[:, 0], fDIS[:, 1], s=16,
                             c=np.sqrt(fDOS[:, 0]**1 + fDOS[:, 1]**1),
                             cmap=cmap, antialiased=True,
                             lw=lineweight, marker='s',
                             edgecolors=edgecolors, label='DIS*')
-                
-                
+
+
                 ax1.set_title('Feasible Desired Input Set (DIS*)', fontsize=10)
-                
+
                 vertices_DOS =  [(DOS_bounds[0, 0], DOS_bounds[1, 0]),
                                  (DOS_bounds[0, 0], DOS_bounds[1, 1]),
                                  (DOS_bounds[0, 1], DOS_bounds[1, 1]),
                                  (DOS_bounds[0, 1], DOS_bounds[1, 0])]
-                
-                
+
+
                 vertices_DOS = np.array(vertices_DOS)
-                
+
                 ax2.fill(vertices_DOS[:, 0], vertices_DOS[:, 1],
                           facecolor='gray', edgecolor='gray',
                           alpha=0.5, label= 'DOS')
-                
-                
+
+
                 ax2.scatter(fDOS[:, 0], fDOS[:, 1], s=16,
                             c=np.sqrt(fDOS[:, 0]**1 + fDOS[:, 1]**1),
                             cmap=cmap, antialiased=True,
                             lw=lineweight, marker='o',
                             edgecolors=edgecolors, label='DOS*')
-                
-                
+
+
                 if labels is not None:
                     if len(labels) != 4:
                         raise ValueError('You need four entries for your custom '+
                                   'labels for your 2x2 system, but entered ' +
                                   'an incorrect number of labels.')
-                        
+
                     else:
                         ax1.set_xlabel(labels[0])
                         ax1.set_ylabel(labels[1])
@@ -1077,33 +1077,33 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     ax1.set_xlabel('$u_{1}$')
                     ax2.set_ylabel('$y_{2}$')
                     ax2.set_xlabel('$y_{1}$')
-                
+
                 ax2.set_title('Feasible Desired Output Set (DOS*)', fontsize=10)
                 plt.legend()
-                
-                
+
+
             elif fDIS.shape[1] == 3 and fDOS.shape[1] == 3:
-                
+
                 fig = plt.figure(figsize=plt.figaspect(0.5))
                 ax = fig.add_subplot(1,2,1, projection='3d')
-                
+
                 plt.rcParams['figure.facecolor'] = 'white'
-                ax.scatter(fDIS[:, 0], fDIS[:, 1], fDIS[:,2], 
-                           s=16, c=np.sqrt(fDOS[:, 0]**2 + 
+                ax.scatter(fDIS[:, 0], fDIS[:, 1], fDIS[:,2],
+                           s=16, c=np.sqrt(fDOS[:, 0]**2 +
                                            fDOS[:, 1]**2 +
                                            fDOS[:, 2]**2),
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='s',
                         edgecolors=edgecolors)
-                
-                
-                
+
+
+
                 if labels is not None:
                     if len(labels) != 6:
                         raise ValueError('You need six entries for your custom '+
                                   'labels for your 3x3 system, but entered ' +
                                   'an incorrect number of labels.')
-                    else:     
+                    else:
                         ax.set_xlabel(labels[0])
                         ax.set_ylabel(labels[1])
                         ax.set_zlabel(labels[2])
@@ -1112,26 +1112,26 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     ax.set_xlabel('$u_{1}$')
                     ax.set_ylabel('$u_{2}$')
                     ax.set_zlabel('$u_{3}$')
-                   
-                    
+
+
                 ax.set_title('DIS*')
-                
+
                 ax = fig.add_subplot(1,2,2, projection='3d')
-                
-                ax.scatter(fDOS[:, 0], 
-                           fDOS[:, 1], 
-                           fDOS[:, 2], 
+
+                ax.scatter(fDOS[:, 0],
+                           fDOS[:, 1],
+                           fDOS[:, 2],
                            s=16,
-                           c=np.sqrt(fDOS[:, 0]**2 + 
-                                     fDOS[:, 1]**2 + 
+                           c=np.sqrt(fDOS[:, 0]**2 +
+                                     fDOS[:, 1]**2 +
                                      fDOS[:, 2]**2),
-                           cmap=cmap, 
+                           cmap=cmap,
                            antialiased=True,
-                           lw=lineweight, 
+                           lw=lineweight,
                            marker='o',
                            edgecolors=edgecolors)
-                
-                
+
+
                 if labels is not None:
                     ax.set_xlabel(labels[3])
                     ax.set_ylabel(labels[4])
@@ -1141,27 +1141,27 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     ax.set_xlabel('$y_{1}$')
                     ax.set_ylabel('$y_{2}$')
                     ax.set_zlabel('$y_{3}$')
-                
-                
-                
+
+
+
                 ax.set_title('$DOS*$')
-                
-                
+
+
             elif fDIS.shape[1] == 2 and fDOS.shape[1] == 3:
-                
+
                 fig = plt.figure(figsize=plt.figaspect(0.5))
                 ax = fig.add_subplot(1,2,1)
-                
+
                 plt.rcParams['figure.facecolor'] = 'white'
-                ax.scatter(fDIS[:, 0], fDIS[:, 1], 
-                           s=16, c=np.sqrt(fDOS[:, 0]**2 + 
+                ax.scatter(fDIS[:, 0], fDIS[:, 1],
+                           s=16, c=np.sqrt(fDOS[:, 0]**2 +
                                            fDOS[:, 1]**2),
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='s',
                         edgecolors=edgecolors)
-                
-                
-                
+
+
+
                 if labels is not None:
                     if len(labels) != 5:
                         raise ValueError('You need five entries for your custom '+
@@ -1170,30 +1170,30 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     else:
                         ax.set_xlabel(labels[0])
                         ax.set_ylabel(labels[1])
-                        
+
                 else:
                     ax.set_xlabel('$u_{1}$')
                     ax.set_ylabel('$u_{2}$')
-                
-                
+
+
                 ax.set_title('DIS*')
-                
+
                 ax = fig.add_subplot(1,2,2, projection='3d')
-                
-                ax.scatter(fDOS[:, 0], 
-                           fDOS[:, 1], 
-                           fDOS[:, 2], 
+
+                ax.scatter(fDOS[:, 0],
+                           fDOS[:, 1],
+                           fDOS[:, 2],
                            s=16,
-                           c=np.sqrt(fDOS[:, 0]**2 + 
-                                     fDOS[:, 1]**2 + 
+                           c=np.sqrt(fDOS[:, 0]**2 +
+                                     fDOS[:, 1]**2 +
                                      fDOS[:, 2]**2),
-                           cmap=cmap, 
+                           cmap=cmap,
                            antialiased=True,
-                           lw=lineweight, 
+                           lw=lineweight,
                            marker='o',
                            edgecolors=edgecolors)
-                
-                
+
+
                 if labels is not None:
                     ax.set_xlabel(labels[2])
                     ax.set_ylabel(labels[3])
@@ -1203,56 +1203,56 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                     ax.set_xlabel('$y_{1}$')
                     ax.set_ylabel('$y_{2}$')
                     ax.set_zlabel('$y_{3}$')
-                    
+
                 ax.set_title('$DOS*$')
-                
+
             elif fDIS.shape[1] == 3 and fDOS.shape[1] == 2:
-                
+
                 fig = plt.figure(figsize=plt.figaspect(0.5))
                 ax = fig.add_subplot(1,2,1, projection='3d')
-                
+
                 plt.rcParams['figure.facecolor'] = 'white'
                 ax.scatter(fDIS[:, 0], fDIS[:, 1], fDIS[:, 2],
-                           s=16, c=np.sqrt(fDOS[:, 0]**2 + 
+                           s=16, c=np.sqrt(fDOS[:, 0]**2 +
                                            fDOS[:, 1]**2 +
                                            fDOS[:, 2]**2),
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='s',
                         edgecolors=edgecolors)
-                
-                
+
+
                 if labels is not None:
                     if len(labels) != 5:
                         raise ValueError('You need five entries for your custom '+
                                   'labels for your 3x2 system, but entered ' +
                                   'an incorrect number of labels.')
-                    else:   
+                    else:
                         ax.set_xlabel(labels[0])
                         ax.set_ylabel(labels[1])
                         ax.set_zlabel(labels[2])
-                        
+
                 else:
                     ax.set_xlabel('$u_{1}$')
                     ax.set_ylabel('$u_{2}$')
                     ax.set_zlabel('$u_{3}$')
-                
-                
+
+
                 ax.set_title('DIS*')
-                
+
                 ax = fig.add_subplot(1,2,2)
-                
-                ax.scatter(fDOS[:, 0], 
+
+                ax.scatter(fDOS[:, 0],
                            fDOS[:, 1],
                            s=16,
-                           c=np.sqrt(fDOS[:, 0]**2 + 
+                           c=np.sqrt(fDOS[:, 0]**2 +
                                      fDOS[:, 1]**2),
-                           cmap=cmap, 
+                           cmap=cmap,
                            antialiased=True,
-                           lw=lineweight, 
+                           lw=lineweight,
                            marker='o',
                            edgecolors=edgecolors)
-                
-                
+
+
                 if labels is not None:
                     ax.set_xlabel(labels[3])
                     ax.set_ylabel(labels[4])
@@ -1260,41 +1260,41 @@ def nlp_based_approach(model: Callable[..., Union[float, np.ndarray]],
                 else:
                     ax.set_xlabel('$y_{1}$')
                     ax.set_ylabel('$y_{2}$')
-                
-                ax.set_title('$DOS*$')   
+
+                ax.set_title('$DOS*$')
             else:
                 print('plot not supported. Dimension higher than 3.')
                 plot is False
                 pass
-        
+
     return fDIS, fDOS, message_list
 
 
 
 def create_grid(region_bounds: np.ndarray, region_resolution: np.ndarray):
-    
-    
+
+
     '''
     Create a multidimensional, discretized grid, given the bounds and the
     resolution.
-    
+
     This function is part of Python-based Process Operability package.
-    
-    Control, Optimization and Design for Energy and Sustainability (CODES) 
+
+    Control, Optimization and Design for Energy and Sustainability (CODES)
     Group - West Virginia University - 2023
-    
+
     Author: San Dinh
 
     Parameters
     ----------
     region_bounds : np.ndarray
         Numpy array that contains the bounds of a (possibily) multidimensional
-        region. Each row corresponds to the lower and upper bound of each 
+        region. Each row corresponds to the lower and upper bound of each
         variable that constitutes the hypercube.
     region_resolution: np.ndarray
-        Array containing the resolution of the discretization grid for the 
-        region. Each element corresponds to the resolution of each variable. 
-        For a resolution defined as k, it will generate d^k points 
+        Array containing the resolution of the discretization grid for the
+        region. Each element corresponds to the resolution of each variable.
+        For a resolution defined as k, it will generate d^k points
         (in which d is the dimensionality of the problem).
 
     Returns
@@ -1302,14 +1302,14 @@ def create_grid(region_bounds: np.ndarray, region_resolution: np.ndarray):
     region_grid: np.ndarray
         Multidimensional array that represents the grid descritization of the
         region in Euclidean coordinates.
-    
-    
+
+
     '''
     # Indexing
     numInput = np.prod(region_resolution)
     nInput = region_bounds.shape[0]
     Input_u = []
-    
+
     # Create discretized region based on bounds and resolution information.
     for i in range(nInput):
         Input_u.append(list(np.linspace(region_bounds[i, 0],
@@ -1336,20 +1336,20 @@ def create_grid(region_bounds: np.ndarray, region_resolution: np.ndarray):
 
 def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 AIS_bound: np.ndarray,
-                AIS_resolution: np.ndarray, 
+                AIS_resolution: np.ndarray,
                 EDS_bound: np.ndarray = None,
-                EDS_resolution: np.ndarray = None, 
+                EDS_resolution: np.ndarray = None,
                 plot: bool = True)-> Union[np.ndarray,np.ndarray]:
     '''
-    Forward mapping for Process Operability calculations (From AIS to AOS). 
+    Forward mapping for Process Operability calculations (From AIS to AOS).
     From an Available Input Set (AIS) bounds and discretization resolution both
-    defined by the user, 
-    this function calculates the corresponding discretized 
+    defined by the user,
+    this function calculates the corresponding discretized
     Available Output Set (AOS).
-    
+
     This function is part of Python-based Process Operability package.
 
-    Control, Optimization and Design for Energy and Sustainability 
+    Control, Optimization and Design for Energy and Sustainability
     (CODES) Group - West Virginia University - 2023
 
     Authors: San Dinh & Victor Alves
@@ -1369,7 +1369,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
         is 'None'.
     EDS_resolution : np.ndarray
         Resolution for the Expected Disturbance Set (EDS). This will be used to
-        discretize the EDS.   
+        discretize the EDS.
     plot: bool
         Turn on/off plot. If dimension is d<=3, plot is available and
         both the Achievable Output Set (AOS) and Available Input
@@ -1384,7 +1384,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
         Discretized Available Output Set (AOS).
 
     '''
-    
+
     # Indexing
     if type(EDS_bound) and type(EDS_resolution) is type(None):
         numInput_map = np.prod(AIS_resolution)
@@ -1399,19 +1399,19 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
         map_bounds = np.concatenate([AIS_bound, EDS_bound])
         map_resolution =  AIS_resolution + EDS_resolution
         EDS = np.zeros(EDS_resolution + [nInput_d])
-        
-        
-    
+
+
+
     Input_map = []
     Input_d = []
-    
+
     # Create discretized AIS based on bounds and resolution information.
     for i in range(nInput_map):
         Input_map.append(list(np.linspace(map_bounds[i, 0],
                                         map_bounds[i, 1],
                                         map_resolution[i])))
-        
-        
+
+
     if (type(EDS_bound) and type(EDS_resolution)) is not type(None):
         for i in range(nInput_d):
             Input_d.append(list(np.linspace(EDS_bound[i, 0],
@@ -1419,15 +1419,15 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                                             EDS_resolution[i])))
     else:
         pass
-    
-    
+
+
     # Create slack variables for preallocation purposes.
     u_d_slack = map_bounds[:, 0]
     y_slack = model(u_d_slack)
     nOutput = y_slack.shape[0]
     input_map = np.zeros(map_resolution + [nInput_map])
     AOS = np.zeros(map_resolution + [nOutput])
-    
+
 
     # General map (AIS+EDS) multidimensional array
     for i in range(numInput_map):
@@ -1442,7 +1442,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
 
         input_map[tuple(inputID)] = map_val
         AOS[tuple(inputID)] = model(map_val)
-        
+
     # EDS multidimensional array.
     if (type(EDS_bound) and type(EDS_resolution)) is not type(None):
         for i in range(numInput_d):
@@ -1456,23 +1456,23 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 map_val.append(Input_d[j][inputID[j]])
 
             EDS[tuple(inputID)] = map_val
-        
+
     else:
         pass
-        
-    
+
+
     # 2D / 3D Plots
     if plot is False:
         pass
     elif plot is True:
         if input_map.shape[-1]  == 2 and AOS.shape[-1] == 2:
-            
+
             input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
                                          input_map.shape[-1])
-            
+
             AOS_plot = AOS.reshape(np.prod(AOS.shape[0:-1]), AOS.shape[-1])
-            
-            _, (ax1, ax2) = plt.subplots(nrows=1,ncols=2, 
+
+            _, (ax1, ax2) = plt.subplots(nrows=1,ncols=2,
                                           constrained_layout=True)
 
             plt.rcParams['figure.facecolor'] = 'white'
@@ -1481,7 +1481,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='s',
                         edgecolors=edgecolors)
-            
+
             ax1.set_xlabel('$u_{1}$')
             if (EDS_bound and EDS_resolution) is None:
                 ax1.set_title('$AIS_{u}$')
@@ -1489,8 +1489,8 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
             else:
                 ax1.set_title('$AIS_{u} \, and \, EDS_{d}$')
                 ax1.set_ylabel('$d_{1}$')
-           
-            
+
+
             ax2.scatter(AOS_plot[:, 0], AOS_plot[:, 1], s=16,
                         c=np.sqrt(AOS_plot[:, 0]**2 + AOS_plot[:, 1]**2),
                         cmap=cmap, antialiased=True,
@@ -1498,13 +1498,13 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                         edgecolors=edgecolors)
             ax2.set_ylabel('$y_{2}$')
             plt.xlabel('$y_{1}$')
-            
+
             ax2.set_title('$AOS$')
 
-            
+
         elif input_map.shape[-1]== 3 and AOS.shape[-1] == 3:
-            
-            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]), 
+
+            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
                                            input_map.shape[-1])
             AOS_plot = AOS.reshape(np.prod(AOS.shape[0:-1]), AOS.shape[-1])
             fig = plt.figure(figsize=plt.figaspect(0.5))
@@ -1517,30 +1517,30 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='s',
                         edgecolors=edgecolors)
-            
+
             ax.set_xlabel('$u_{1}$')
 
             if (type(EDS_bound) and type(EDS_resolution)) is type(None):
                 ax.set_title('$AIS_{u}$')
                 ax.set_ylabel('$u_{2}$')
                 ax.set_zlabel('$u_{3}$')
-               
+
             elif EDS_bound.shape[0] == 2:
                 ax.set_title('$AIS_{u} \, and  \, EDS_{d}$')
-                
+
                 ax.set_ylabel('$d_{1}$')
                 ax.set_zlabel('$d_{2}$')
             elif EDS_bound.shape[0] == 1:
                 ax.set_title('$AIS_{u} \, and \, EDS_{d}$')
                 ax.set_ylabel('$u_{2}$')
                 ax.set_zlabel('$d_{1}$')
-                
-            
 
-            
+
+
+
             ax = fig.add_subplot(1,2,2, projection='3d')
             ax.scatter(AOS_plot[:, 0], AOS_plot[:, 1], AOS_plot[:, 2], s=16,
-                        c=np.sqrt(AOS_plot[:, 0]**2 + AOS_plot[:, 1]**2 + 
+                        c=np.sqrt(AOS_plot[:, 0]**2 + AOS_plot[:, 1]**2 +
                                   AOS_plot[:, 2]**2),
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='o',
@@ -1549,14 +1549,14 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
             ax.set_xlabel('$y_{1}$')
             ax.set_zlabel('$y_{3}$')
             ax.set_title('$AOS$')
-            
+
         elif input_map.shape[-1] == 2 and AOS.shape[-1] == 3:
-            
-            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]), 
+
+            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
                                      input_map.shape[-1])
             AOS_plot = AOS.reshape(np.prod(AOS.shape[0:-1]), AOS.shape[-1])
             fig = plt.figure(figsize=plt.figaspect(0.5))
-            
+
             ax = fig.add_subplot(1,2,1)
 
             plt.rcParams['figure.facecolor'] = 'white'
@@ -1568,7 +1568,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
 
             ax.set_xlabel('$u_{1}$')
 
-            
+
 
             if (type(EDS_bound) and type(EDS_resolution)) is type(None):
                 plt.title('$AIS_{u}$')
@@ -1576,11 +1576,11 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
             else:
                 plt.title('$AIS_{u} \, and \, EDS_{d}$')
                 plt.ylabel('$d_{1}$')
-            
-            
+
+
             ax = fig.add_subplot(1,2,2, projection='3d')
             ax.scatter(AOS_plot[:, 0], AOS_plot[:, 1], AOS_plot[:, 2], s=16,
-                        c=np.sqrt(AOS_plot[:, 0]**2 + AOS_plot[:, 1]**2 + 
+                        c=np.sqrt(AOS_plot[:, 0]**2 + AOS_plot[:, 1]**2 +
                                   AOS_plot[:, 2]**2),
                         cmap=cmap, antialiased=True,
                         lw=lineweight, marker='o',
@@ -1589,11 +1589,11 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
             ax.set_xlabel('$y_{1}$')
             ax.set_zlabel('$y_{3}$')
             ax.set_title('$AOS$')
-            
-            
+
+
         elif input_map.shape[-1] == 3 and AOS.shape[-1] == 2:
-            
-            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]), 
+
+            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
                                            input_map.shape[-1])
             AOS_plot = AOS.reshape(np.prod(AOS.shape[0:-1]), AOS.shape[-1])
             fig = plt.figure(figsize=plt.figaspect(0.5))
@@ -1615,15 +1615,15 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
 
             elif EDS_bound.shape[0] == 2:
                 ax.set_title('$AIS_{u} \, and \, EDS_{d}')
-                
+
                 ax.set_ylabel('$d_{1}$')
                 ax.set_zlabel('$d_{2}$')
             elif EDS_bound.shape[0] == 1:
                 ax.set_title('$AIS_{u} \, and \, EDS_{d}$')
                 ax.set_ylabel('$u_{2}$')
                 ax.set_zlabel('$d_{1}$')
-            
-            
+
+
             ax = fig.add_subplot(1,2,2)
 
             ax.scatter(AOS_plot[:, 0], AOS_plot[:, 1], s=16,
@@ -1633,32 +1633,32 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                         edgecolors=edgecolors)
             ax.set_ylabel('$y_{2}$')
             ax.set_xlabel('$y_{1}$')
-            
+
             ax.set_title('$AOS$')
-                
-            
+
+
         else:
             print('dimension greater than 3, plot not supported.')
-            
+
     else:
         pass
-            
-    
+
+
     return input_map, AOS
 
 
 def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
                                                                 np.ndarray]:
     '''
-    Generation of connected simplices (k+1 convex hull of k+1 vertices) 
+    Generation of connected simplices (k+1 convex hull of k+1 vertices)
     based on the AIS/AOS points.
-    
-    
+
+
     This function is part of Python-based Process Operability package.
-    
-    Control, Optimization and Design for Energy and Sustainability 
+
+    Control, Optimization and Design for Energy and Sustainability
     (CODES) Group - West Virginia University - 2023
-    
+
     Author: San Dinh
 
     Parameters
@@ -1674,7 +1674,7 @@ def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
         List of input (AIS) vertices for each simplex generated, in the form of
         an array.
     AOS_simplices : np.ndarray
-        List of output (AOS) vertices for each simplex generated, in the form 
+        List of output (AOS) vertices for each simplex generated, in the form
         of an array.
 
     '''
@@ -1728,8 +1728,8 @@ def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
 
                 ID = [a + b for a, b in zip([inputID]*(nInput + 1),
                                             simplex_vertices[k])]
-                
-                
+
+
 
                 V_AOS_id = np.zeros((nOutputVar, nInput + 1))
                 V_AIS_id = np.zeros((nInputVar, nInput + 1))
@@ -1740,10 +1740,10 @@ def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
 
                 AOS_simplices.append(V_AOS_id)
                 AIS_simplices.append(V_AIS_id)
-                
-                
-                
-                
+
+
+
+
     # Putting polytopes together.
     for i, simplex in enumerate(AOS_simplices):
         poly = pc.qhull(simplex.T)
@@ -1754,7 +1754,7 @@ def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
         AIS_simplices[i] = pc.extreme(poly)
 
 
-    
+
     return AIS_simplices, AOS_simplices
 
 
@@ -1762,12 +1762,12 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
                                                                 np.ndarray]:
     '''
     Generation of connected polyhedra based on the AIS/AOS points.
-    
+
     This function is part of Python-based Process Operability package.
-    
-    Control, Optimization and Design for Energy and Sustainability 
+
+    Control, Optimization and Design for Energy and Sustainability
     (CODES) Group - West Virginia University - 2023
-    
+
     Author: San Dinh
 
     Parameters
@@ -1780,10 +1780,10 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
     Returns
     -------
     AIS_polytope : np.ndarray
-        List of input (AIS) vertices for each polytope generated, in the form 
+        List of input (AIS) vertices for each polytope generated, in the form
         of an array.
     AOS_polytope : np.ndarray
-        List of output (AOS) vertices for each polyhedra generated, in the form 
+        List of output (AOS) vertices for each polyhedra generated, in the form
         of an array.
 
     '''
@@ -1804,7 +1804,7 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
     # Preallocation
     AOS_polytope = list()
     AIS_polytope = list()
-    
+
     for i in range(numInput):
         inputID[0] = int(np.mod(i, resolution[0]))
 
@@ -1825,8 +1825,8 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
 
             AOS_polytope.append(V_AOS_id)
             AIS_polytope.append(V_AIS_id)
-            
-            
+
+
     # Putting polytopes together.
     for i, simplex in enumerate(AOS_polytope):
         poly = pc.qhull(simplex.T)
@@ -1840,14 +1840,14 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
     return AIS_polytope, AOS_polytope
 
 
-def implicit_map(model:             Callable[...,Union[float,np.ndarray]], 
-                 image_init:        np.ndarray, 
-                 domain_bound:      np.ndarray = None, 
-                 domain_resolution: np.ndarray = None, 
+def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
+                 image_init:        np.ndarray,
+                 domain_bound:      np.ndarray = None,
+                 domain_resolution: np.ndarray = None,
                  domain_points:     np.ndarray = None,
-                 direction:         str = 'forward', 
-                 validation:        str = 'predictor-corrector', 
-                 tol_cor:           float = 1e-4, 
+                 direction:         str = 'forward',
+                 validation:        str = 'predictor-corrector',
+                 tol_cor:           float = 1e-4,
                  continuation:      str = 'Explicit RK4',
                  derivative:        str = 'jax',
                  jit:               bool = True,
@@ -1855,64 +1855,64 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
     '''
     Performs implicit mapping of an implicitly defined process F(u,y) = 0.
     Performs implicit mapping of an implicitly defined process F(u,y) = 0.
-    F can be a vector-valued, multivariable function, which is typically the 
-    case for chemical processes studied in Process Operability. 
+    F can be a vector-valued, multivariable function, which is typically the
+    case for chemical processes studied in Process Operability.
     This method relies on the implicit function theorem and automatic
     This method relies on the implicit function theorem and automatic
-    differentiation in order to obtain the mapping of the required 
+    differentiation in order to obtain the mapping of the required
     input/output space. The
     mapping "direction" can be set by changing the 'direction' parameter.
-    
+
     Authors: San Dinh & Victor Alves
-    
-    Control, Optimization and Design for Energy and Sustainability 
+
+    Control, Optimization and Design for Energy and Sustainability
     (CODES) Group - West Virginia University - 2023
-    
+
 
     Parameters
     ----------
     implicit_model : Callable[...,Union[float,np.ndarray]]
-        Process model that describes the relationship between the input and 
+        Process model that describes the relationship between the input and
         output spaces. Has to be written as a function in the following form:
             F(Input Vector, Output Vector) = 0
     domain_bound : np.ndarray
         Domains of the domain variables. Each row corresponds to the lower and
         upper bound of each variable. The domain terminology corresponds to the
         mathematical definition of the domain of a function: If the mapping is
-        in the foward direction (direction = 'forward'), then the domain 
-        corresponds to the process inputs. Otherwise, the mapping is in the 
+        in the foward direction (direction = 'forward'), then the domain
+        corresponds to the process inputs. Otherwise, the mapping is in the
         inverse direction and the domain corresponds to the process outputs.
     domain_resolution : np.ndarray
         Array containing the resolution of the discretization grid for the domain.
-        Each element corresponds to the resolution of each variable. For a 
+        Each element corresponds to the resolution of each variable. For a
         resolution defined as k, it will generate d^k points (in which d is the
         dimensionality of the domain).
     direction : str, optional
-        Mapping direction. this will define if a forward or inverse mapping is 
+        Mapping direction. this will define if a forward or inverse mapping is
         performed. The default is 'forward'.
     validation : str, optional
         How the implicit mapping is obatined. The default is 'predictor-corrector'.
         The available options are:
             'predictor' => Numerical integration only.
-            
+
             'corrector' => Solved using a nonlinear equation solver.
-            
-            'predictor-corrector' => Numerical integration + correction using 
+
+            'predictor-corrector' => Numerical integration + correction using
             nonlinear equation solver if F(u, y) >= Tolerance.
-        
+
     tol_cor : float, optional
-        Tolerance for solution of the implicit function F(u,y) <= tol_cor. 
+        Tolerance for solution of the implicit function F(u,y) <= tol_cor.
         The algorithm will keep solving the implicit mapping while
         F(u,y) >= tol_cor. The default is 1e-4.
     continuation : str, optional
         Numerical continuation method used in the implicit mapping.
         The default is 'Explicit RK4' .
-        
+
         'Explicit Euler' - Euler's method. Good for simple (nonstiff) problems.
-        
+
         'Explicit RK4'   - Fixed-step 4th order Runge-Kutta. Good for moderate,
         mildly stiff problems. Good balance between accuracy and complexity.
-        
+
         'Odeint'         - Variable step Runge-Kutta. Suitable for challenging,
         high-dimensional and stiff problems. This is a fully-featured IVP solver.
 
@@ -1920,20 +1920,20 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
         Derivative calculation method. If JAX is available, automatic
         differentiation can be performed. The default is 'jax'.
     jit:  bool True, optional
-        JAX's Just-in-time compilation (JIT) of implicit function and its 
+        JAX's Just-in-time compilation (JIT) of implicit function and its
         respective multidimensional derivatives (Jacobians). JIT allows faster
         computation of the implicit map. The default is True.
     step_cutting:      bool, False, optional
         Cutting step strategy to subdivide the domain/image in case of stiffness.
         The default is 'False'.
-    
+
     Returns
     -------
     domain_set: np.ndarray
         Set of values that corresponds to the domain of the implicit function.
     image_set: np.ndarray
         Set of values that corresponds to the calculated image of the implicit
-        function., 
+        function.,
     domain_polyhedra:  list
         Set of coordinates for polytopic construction of the domain. Can be used
         to create polytopes for multimodel representation and/or OI evaluation
@@ -1943,16 +1943,16 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
         of the implicit function. Similarly to 'domain_polyhedra', this list can
         be used to construct polytopes for multimodel representation and OI
         evaluation.
-        
+
     References
     ----------
     V. Alves, J. R. Kitchin, and F. V. Lima. "An inverse mapping approach for process
-    systems engineering using automatic differentiation and the implicit 
-    function theorem". AIChE Journal, 2023. 
+    systems engineering using automatic differentiation and the implicit
+    function theorem". AIChE Journal, 2023.
     https://doi.org/10.1002/aic.18119
 
     '''
-    
+
     # Implicit function theorem and pre-configuration steps.
     if direction == 'forward':
         print('Forward Mapping Selected.')
@@ -1961,7 +1961,7 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
 
         def F(i, o)   : return model(i, o)
         def F_io(o, i): return model(i, o)
-        
+
     elif direction == 'inverse':
         print('Inverse Mapping Selected.')
         print('The given domain is recognized as Desired Output Set (DOS).')
@@ -1990,13 +1990,13 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
               calculating derivatives. Exiting code.')
         sys.exit()
 
-                 
+
 
     if jit is True:
         @jit
         def dodi(ii,oo):
             return -jnp.linalg.pinv(dFdo(ii,oo)) @ dFdi(ii,oo)
-        
+
         @jit
         def dods(oo, s, s_length, i0, iplus):
             return dodi(i0 + (s/s_length)*(iplus - i0), oo) \
@@ -2006,86 +2006,86 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
         def dods(oo, s, s_length, i0, iplus): return dodi(
             i0 + (s/s_length)*(iplus - i0), oo)@((iplus - i0)/s_length)
 
-        
+
     #  Initialization step: obtaining first solution
     # sol = root(F_io, image_init,args=domain_bound[:,0])
-    
+
     #  Predictor scheme selection
     if continuation == 'Explicit RK4':
         print('Selected RK4')
-        
-        
+
+
         def predict_RK4(dodi, i0, iplus, o0):
             h = iplus -i0
             k1 = dodi( i0          ,  o0           )
             k2 = dodi( i0 + (1/2)*h,  o0 + (h/2) @ k1)
             k3 = dodi( i0 + (1/2)*h,  o0 + (h/2) @ k1)
             k4 = dodi(np.array(i0+h), o0 +      h@ k3)
-            
+
             return o0 + (1/6)*(k1 + 2*k2 + 2*k3 + k4) @ h
-        
+
         predict = predict_RK4
         do_predict = dodi
-        
+
     elif continuation == 'Explicit Euler':
-        
+
         print('Selected Euler')
-        
+
         def predict_eEuler(dodi, i0, iplus, o0):
             return o0 + dodi(i0,o0)@(iplus -i0)
-        
+
         predict = predict_eEuler
         do_predict = dodi
-        
+
     elif continuation == 'odeint':
-        
+
         print('Selected odeint')
-        
+
         def predict_odeint(dods, i0, iplus, o0):
             s_length = norm(iplus - i0)
             s_span = np.linspace(0.0, s_length, 10)
             sol = odeint(dods, o0, s_span, s_length, i0, iplus)
             return sol[-1,:]
-        
+
         predict = predict_odeint
         do_predict = dods
-        
+
     else:
         print('Ivalid continuation method. Exiting algorithm.')
         sys.exit()
-      
+
     def predict_eEuler(dodi, i0, iplus, o0):
         return o0 + dodi(i0,o0)@(iplus -i0)
     # This code below is a partial implementation of implicit mapping with a
-    # closed path. It works for applications in which the meshgrid can be 
+    # closed path. It works for applications in which the meshgrid can be
     # inferred from a discrete path.
     # TODO: Work in a definitive solution that can be generalized.
     solv_method =  'hybr'
     if domain_points is not None:
         # Determine dimension
         d = domain_points.shape[1]
-        
+
         # Calculate side length of grid (assumes cubic/square grid)
         side_length = int(domain_points.shape[0] ** (1/d))
-        
+
         # Reshape into the desired shape
         domain_set = domain_points.reshape(*([side_length]*d), d)
-    
+
         # Update other dependent parameters
         nInput = domain_set.shape[-1]
         numInput = np.prod([side_length]*d)
         domain_resolution = [side_length]*d  # inferred resolution
         image_set = np.zeros(domain_resolution + [nInput])*np.nan
         #  Initialization step: obtaining first solution
-        
+
         sol = root(F_io, image_init,args=domain_points[0,:], method=solv_method)
         image_set[0, 0] = sol.x
         nOutput = image_init.shape[0]
-        
+
         for i in range(numInput):
             inputID = [0]*nInput
             inputID[0] = int(np.mod(i, domain_resolution[0]))
-    
+
     else:
         # Pre-alocating the domain set
         numInput = np.prod(domain_resolution)
@@ -2116,10 +2116,10 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
                 domain_val.append(Input_u[j][inputID[j]])
 
             domain_set[tuple(inputID)] = domain_val
-     
+
     # End of partial implementation. Below we have the OG code that I will leave
     # here for my own sake of sanity.
-    
+
     # --------------------------- Previous strategy ------------------------- #
     # # Pre-allocating the domain set
     # numInput = np.prod(domain_resolution)
@@ -2150,12 +2150,12 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
     #     domain_set[tuple(inputID)] = domain_val
 
     # --------------------------- End of Previous strategy ------------------ #
-    
+
     cube_vertices = list()
     for n in range(2**(nInput)):
         cube_vertices.append([int(x) for x in
                               np.binary_repr(n, width=nInput)])
-    
+
     # Preallocate domain and image polyhedras
     domain_polyhedra = list()
     image_polyhedra = list()
@@ -2184,28 +2184,28 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
 
                 else:
                     if validation == 'predictor-corrector':
-                        if (np.isnan(np.prod(image_set[ID_cell])) 
+                        if (np.isnan(np.prod(image_set[ID_cell]))
                             and np.isnan(np.prod(image_0)) == False):
-                            
+
                             domain_k = domain_set[ID_cell]
                             V_domain_id[:, k] = domain_k
                             if step_cutting == True:
-                                test_img_k = predict_eEuler(do_predict, 
+                                test_img_k = predict_eEuler(do_predict,
                                                             domain_0,
-                                                            domain_k, 
+                                                            domain_k,
                                                             image_0)
                                 domain_k_test = domain_k
                                 count = 1
                                 condition = max(
                                     abs(F(domain_k_test, test_img_k)))
-                                while ((condition > tol_cor or 
-                                        np.isnan(condition)) 
+                                while ((condition > tol_cor or
+                                        np.isnan(condition))
                                        and count < 10):
 
                                     count = count + 1
-                                    test_img_k = predict_eEuler(do_predict, 
+                                    test_img_k = predict_eEuler(do_predict,
                                                                 domain_0,
-                                                                domain_k_test, 
+                                                                domain_k_test,
                                                                 image_0)
                                     domain_k_test = (domain_k_test*(count-1) \
                                                      + domain_0) / count
@@ -2213,44 +2213,44 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
                                     condition = max(
                                         abs(F(domain_k_test, test_img_k)))
 
-                                
+
                                 domain_k_step_size = domain_k_test
                                 domain_kk_minus = domain_0
                                 image_kk_minus = image_0
                                 if count < 10:
                                     for kk in range(count):
-                                        
+
                                         domain_kk = domain_0 + \
                                         domain_k_step_size*count
-                                        
-                                        image_kk = predict(do_predict, 
-                                                           domain_kk_minus, 
-                                                           domain_kk, 
+
+                                        image_kk = predict(do_predict,
+                                                           domain_kk_minus,
+                                                           domain_kk,
                                                            image_kk_minus)
                                         image_kk_minus = image_kk
 
                                 image_k = image_kk_minus
                             else:
-                                image_k = predict(do_predict, 
-                                                  domain_0, 
-                                                  domain_k, 
+                                image_k = predict(do_predict,
+                                                  domain_0,
+                                                  domain_k,
                                                   image_0)
 
                             max_residual = max(abs(F(domain_k, image_k)))
-                            if (max_residual**2 > tol_cor or 
+                            if (max_residual**2 > tol_cor or
                                 np.isnan(max_residual)):
-                                
+
                                 # Call the corrector:
                                 sol = root(F_io, image_0, args=domain_k, method=solv_method)
                                 found_sol = sol.success
-                                
+
                                 # Treat case in which solution is not found:
                                 if found_sol:
                                     image_k = sol.x
                                 else:
                                     image_k = np.nan
-                                    
-                            
+
+
                             image_set[ID_cell] = image_k
                             V_image_id[:, k] = image_k
                         else:
@@ -2258,48 +2258,48 @@ def implicit_map(model:             Callable[...,Union[float,np.ndarray]],
                             V_domain_id[:, k] = domain_k
                             image_k = image_set[ID_cell]
                             V_image_id[:, k] = image_k
-                            
 
-                    elif validation == 'predictor': 
+
+                    elif validation == 'predictor':
                         if np.isnan(np.prod(image_set[ID_cell])):
                             domain_k = domain_set[ID_cell]
                             V_domain_id[:,k] = domain_k
-                            
+
                             image_k = predict(do_predict,
                                               domain_0,
                                               domain_k,
                                               image_0)
-                                                                                     
+
                             image_set[ID_cell] = image_k
                             V_image_id[:,k] = image_k
-                            
-                    elif validation == 'Corrector':     
+
+                    elif validation == 'Corrector':
                         domain_k = domain_set[ID_cell]
                         V_domain_id[:,k] = domain_k
-                        
+
                         sol = root(F_io, image_0, args=domain_k, method=solv_method)
                         image_k = sol.x
-                        
+
                         image_set[ID_cell] = image_k
                         V_image_id[:,k]    = image_k
-                        
+
             domain_polyhedra.append(V_domain_id)
             image_polyhedra.append(V_image_id)
-            
+
     return domain_set, image_set, domain_polyhedra, image_polyhedra
 
-# The functions below are fundamental for operability calculations, though  
-# typical users won't need to directly interact with them. They play a crucial 
-# role within 'opyrability' without requiring user intervention, but are 
+# The functions below are fundamental for operability calculations, though
+# typical users won't need to directly interact with them. They play a crucial
+# role within 'opyrability' without requiring user intervention, but are
 # documented here nevertheless.
 def get_extreme_vertices(bounds: np.ndarray) -> np.ndarray:
     """
     Gets the extreme vertices of any D-dimensional hypercube. This is used to
     plot the DOS in 3D.
-    
+
     Author: Victor Alves
-    
-    Control, Optimization and Design for Energy and Sustainability 
+
+    Control, Optimization and Design for Energy and Sustainability
     (CODES) Group - West Virginia University - 2023
 
     Parameters
@@ -2325,44 +2325,44 @@ def get_extreme_vertices(bounds: np.ndarray) -> np.ndarray:
     return extreme_vertices
 
 
-def process_overlapping_polytopes(bound_box: pc.Polytope, 
+def process_overlapping_polytopes(bound_box: pc.Polytope,
                                   overlapped_intersection: pc.Region) -> pc.Region:
     """
-   Eliminate overlaps between polytopes given a bounding box and a region of 
+   Eliminate overlaps between polytopes given a bounding box and a region of
    potentially overlapping polytopes.
 
-   The function aims to process a set of polytopes such that the resultant 
+   The function aims to process a set of polytopes such that the resultant
    polytopes within the specified bounding
    box do not overlap with each other.
-   
-   This was initially suggested by David Vinson in his Ph.D. dissertation 
-   "A new measure of process operability for the improved steady-state design 
+
+   This was initially suggested by David Vinson in his Ph.D. dissertation
+   "A new measure of process operability for the improved steady-state design
    of chemical processes. Ph.D. Thesis, Lehigh University, USA, 2000."
-   
+
    This has been refined by me to perform the subraction of polytopes if and only
-   if the polytopes are indeed overlapping. This is checked by 
+   if the polytopes are indeed overlapping. This is checked by
    function 'are_overlapping'. Hence, computational time is largely reduced.
    In addition, this avoids numerical instability in the LP that could
    potentially lead to unbounded solutions (infesaible).
-   
+
    Author: Victor Alves
-   
-   Control, Optimization and Design for Energy and Sustainability 
+
+   Control, Optimization and Design for Energy and Sustainability
    (CODES) Group - West Virginia University - 2023
 
    Parameters
    ----------
    bound_box : pc.Polytope
        The bounding polytope within which all other polytopes are contained.
-   
+
    overlapped_intersection : pc.Region
-       A collection of polytopes (encapsulated in a pc.Region) that may 
+       A collection of polytopes (encapsulated in a pc.Region) that may
        potentially overlap with each other.
 
    Returns
    -------
    pc.Region
-       A region consisting of polytopes that are within the bounding box 
+       A region consisting of polytopes that are within the bounding box
        and do not overlap with each other.
 
 
@@ -2399,12 +2399,12 @@ def process_overlapping_polytopes(bound_box: pc.Polytope,
                 print('Some overlapping polytopes could not be resolved.')
                 continue
 
-        # If there was no overlap with existing non-overlapping polytopes, 
+        # If there was no overlap with existing non-overlapping polytopes,
         # add it to the list
         if not overlapping:
             non_overlapping_polytopes.append(current_poly)
 
-    # Intersect each polytope in the non_overlapping_polytopes list with the 
+    # Intersect each polytope in the non_overlapping_polytopes list with the
     # bounding box
     final_polytopes = []
     for poly in non_overlapping_polytopes:
@@ -2426,10 +2426,10 @@ def process_overlapping_polytopes(bound_box: pc.Polytope,
 def are_overlapping(poly1, poly2):
     """
    Check if two polytopes overlap.
-   
+
    Author: Victor Alves
-   
-   Control, Optimization and Design for Energy and Sustainability 
+
+   Control, Optimization and Design for Energy and Sustainability
    (CODES) Group - West Virginia University - 2023
 
    Parameters
@@ -2445,3 +2445,225 @@ def are_overlapping(poly1, poly2):
        True if the polytopes overlap, False otherwise.
    """
     return not pc.is_empty(pc.intersect(poly1, poly2))
+
+# ------------------------------------------------------------------------------
+# Hunter additions for forward mapping into weighted OI eval
+
+
+def exhaustive_weighted_OI_eval(
+        process_model: Callable[..., Union[float, np.ndarray]],
+        weighting_model: Callable[..., Union[float, np.ndarray]],
+        AIS_bounds: np.ndarray,
+        AIS_resolution: list,
+        DOS_bounds: np.ndarray,
+        oi_eval_perspective: str = 'inputs',
+        plot: bool = True,
+):
+
+    AIS, AOS = AIS2AOS_map(process_model, AIS_bounds, AIS_resolution, plot=plot)
+    AIS, AOS = append_weighting_factors(weighting_model, AIS, AOS)
+    AIS_poly, AOS_poly = points2polyhedra(AIS, AOS)
+    AIS_region, AOS_region = list_to_region(AIS_poly), list_to_region(AOS_poly)
+    DISuAIS_region, DOSuAOS_region = interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds)
+    DISuAIS_poly, DOSuAOS_poly = region_to_list(DISuAIS_region), region_to_list(DOSuAOS_region)
+
+    if plot:
+        if AIS_region.dim == 2:
+            plot_2d_region(AIS_region, DISuAIS_region, perspective='inputs')
+        elif AIS_region.dim == 3:
+            plot_3d_region(AIS_poly, DISuAIS_poly, perspective='inputs')
+        else:
+            print(f"plotting is not supported for the AIS with {AIS_region.dim} dimensions")
+
+        if AOS_region.dim == 2:
+            plot_2d_region(AOS_region, DOSuAOS_region, perspective='outputs')
+        elif AIS_region.dim == 3:
+            plot_3d_region(AOS_poly, DOSuAOS_poly, perspective='outputs')
+        else:
+            print(f"plotting is not supported for the AIS with {AIS_region.dim} dimensions")
+
+    if oi_eval_perspective == 'inputs':
+        OI = DISuAIS_region.volume / AIS_region.volume
+    elif oi_eval_perspective == 'outputs':
+        OI = DISuAIS_region.volume / AIS_region.volume
+    else:
+        print(f"OI not calculated, provide an appropriate perspective")
+    print(f"{oi_eval_perspective} OI: {round(OI, 4)}")
+
+    return OI
+
+
+def interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds):
+    # TODO: interpret overlapping regions which are weighted
+    DS_poly = pc.box2poly(DOS_bounds)
+
+    DISuAIS, DOSuAOS = list(), list()
+    float_tol = 1e-6
+    for AI_poly_weighted, AO_poly_weighted in zip(AIS_region, AOS_region):
+
+        # project polytope into ndim-1 to not include weighting factors
+        AO_poly = pc.projection(AO_poly_weighted, list(range(1, AOS_region[0].dim)))
+
+        if AO_poly.volume == 0:
+            # output solutions have multiplicites
+            # check if overlapping vertices are within DOS
+            vertices_check = [vertices[0:-1] for vertices in AO_poly_weighted.vertices]
+            if all(
+                    all(
+                        (DOS_bounds[dim][0]-(DOS_bounds[dim][0]*float_tol)) <= value <= (DOS_bounds[dim][1]+(DOS_bounds[dim][1]*float_tol))
+                        for dim, value in enumerate(coord)
+                    ) for coord in vertices_check
+            ):
+                DISuAIS.append(AI_poly_weighted), DOSuAOS.append(AO_poly_weighted)
+        else:
+            # check if polytope regions are at least 50% contained within the DOS
+            if pc.intersect(AO_poly, DS_poly).volume / (AO_poly.volume+1e-8) >= 0.50:
+                DISuAIS.append(AI_poly_weighted), DOSuAOS.append(AO_poly_weighted)
+
+    return pc.Region(DISuAIS), pc.Region(DOSuAOS)
+
+
+def list_to_region(vertices_list):
+    polytopes = list()
+    for i in range(len(vertices_list)):
+        polytopes.append(pc.qhull(vertices_list[i]))
+    region = pc.Region(polytopes[0:])
+
+    return region
+
+
+def region_to_list(region):
+    vertices_list = list()
+    for i in range(len(region)):
+        vertices_list.append(region[i].vertices)
+
+    return vertices_list
+
+
+def plot_2d_region(mapped_region, intersection, perspective):
+
+    fig, ax = plt.subplots()
+    if len(mapped_region) == 0:
+        polyplot = _get_patch(mapped_region, linestyle="solid",
+                                    edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
+                                    facecolor=AS_COLOR)
+        ax.add_patch(polyplot)
+    else:
+        for i in range(len(mapped_region)):
+            polyplot = _get_patch(mapped_region[i], linestyle="solid",
+                                        edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
+                                        facecolor=AS_COLOR)
+            ax.add_patch(polyplot)
+
+    if len(intersection) == 0:
+        polyplot = _get_patch(intersection, linestyle="solid",
+                                    edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
+                                    facecolor=INTERSECT_COLOR)
+        ax.add_patch(polyplot)
+    else:
+        for i in range(len(intersection)):
+            polyplot = _get_patch(intersection[i], linestyle="solid",
+                                        edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
+                                        facecolor=INTERSECT_COLOR)
+            ax.add_patch(polyplot)
+
+    bounding_region = pc.Region([polytope for polytope in mapped_region.list_poly if polytope.volume != 0])
+    lower_xaxis = bounding_region.bounding_box[0][0]
+    upper_xaxis = bounding_region.bounding_box[1][0]
+    lower_yaxis = bounding_region.bounding_box[0][1]
+    upper_yaxis = bounding_region.bounding_box[1][1]
+
+    ax.set_xlim(lower_xaxis - 0.05 * lower_xaxis,
+                upper_xaxis + 0.05 * upper_xaxis)
+    ax.set_ylim(lower_yaxis - 0.05 * lower_yaxis,
+                upper_yaxis + 0.05 * upper_yaxis)
+
+    if perspective == 'inputs':
+        ax.set_title('Input Space')
+    if perspective == 'outputs':
+        ax.set_title('Output Space')
+
+
+def plot_3d_region(mapped_region, intersection, perspective):
+
+    fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
+
+    for cube in mapped_region:
+        hull = sp.spatial.ConvexHull(cube)
+        # Draw the polygons of the convex hull
+        for s in hull.simplices:
+            tri = Poly3DCollection([cube[s]])
+            tri.set_color(AS_COLOR)
+            tri.set_alpha(0.5)
+            tri.set_edgecolor(EDGES_COLORS)
+            ax.add_collection3d(tri)
+        # Draw the vertices
+        ax.scatter(cube[:, 0], cube[:, 1], cube[:, 2], marker='o',
+                   color='None')
+
+    for cube in intersection:
+        hull = sp.spatial.ConvexHull(cube)
+        # Draw the polygons of the convex hull
+        for s in hull.simplices:
+            tri = Poly3DCollection([cube[s]])
+            tri.set_color(INTERSECT_COLOR)
+            tri.set_alpha(0.5)
+            tri.set_edgecolor(EDGES_COLORS)
+            ax.add_collection3d(tri)
+        # Draw the vertices
+        ax.scatter(cube[:, 0], cube[:, 1], cube[:, 2], marker='o',
+                   color='None')
+
+    if perspective == 'inputs':
+        ax.set_title('Input Space')
+    if perspective == 'outputs':
+        ax.set_title('Output Space')
+
+
+def append_weighting_factors(weight_model, input_set, output_set):
+    # reshape sets to a sequential array of coordinates (of length ndim)
+    # inputs
+    input_shape = list(input_set.shape)
+    input_read = np.reshape(input_set, (np.prod(input_shape[:-1]), input_set.ndim - 1))
+    input_reshape = input_shape
+    input_reshape.insert(-1, 2)
+    input_reshape[-1] = input_reshape[-1] + 1
+    # outputs
+    output_shape = list(output_set.shape)
+    output_read = np.reshape(output_set, (np.prod(output_shape[:-1]), output_set.ndim - 1))
+    output_reshape = output_shape
+    output_reshape.insert(-1, 2)
+    output_reshape[-1] = output_reshape[-1] + 1
+    # weighting factors
+    weight_shape = list(input_read.shape)
+    weight_shape[0] = 2*weight_shape[0]
+    weight_shape[-1] = 1
+    weight_set = np.zeros(tuple(weight_shape))
+    input_newshape = list(input_read.shape)
+    input_newshape[0] = 2*input_newshape[0]
+    input_new = np.zeros(tuple(input_newshape))
+    output_newshape = list(output_read.shape)
+    output_newshape[0] = 2*output_newshape[0]
+    output_new = np.zeros(tuple(output_newshape))
+
+    # evaluate weighting factor model
+    for i in range(len(input_read)):
+        weight_set[2*i] = weight_model(input_read[i])
+        input_new[2*i] = input_read[i]
+        input_new[2*i+1] = input_read[i]
+        output_new[2*i] = output_read[i]
+        output_new[2*i+1] = output_read[i]
+
+    # reshape sets to original shape now including the weighting factors
+    # weighting factors
+    weight_new = weight_set
+    # inputs
+    # input_new = np.concatenate([input_read, input_read], axis=0)
+    input_final = np.concatenate([input_new, weight_new], axis=-1)
+    input_final = np.reshape(input_final, tuple(input_reshape))
+    # outputs
+    # output_new = np.concatenate([output_read, output_read], axis=0)
+    output_final = np.concatenate([output_new, weight_new], axis=-1)
+    output_final = np.reshape(output_final, tuple(output_reshape))
+
+    return input_final, output_final
