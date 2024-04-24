@@ -4,8 +4,6 @@ import warnings
 import string
 from itertools import permutations as perms
 from typing import Callable, Union
-from itertools import permutations as perms
-from typing import Callable, Union
 from tqdm import tqdm
 
 # Linear Algebra
@@ -1381,7 +1379,6 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
         Discretized Available Input Set (AIS).
     AOS : np.ndarray
         Discretized Available Output Set (AOS).
-        Discretized Available Output Set (AOS).
 
     '''
 
@@ -1465,7 +1462,26 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
     if plot is False:
         pass
     elif plot is True:
-        if input_map.shape[-1]  == 2 and AOS.shape[-1] == 2:
+        if input_map.shape[-1]  == 1 and AOS.shape[-1] == 1:
+
+            input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
+                                           input_map.shape[-1])
+
+            AOS_plot = AOS.reshape(np.prod(AOS.shape[0:-1]), AOS.shape[-1])
+
+            _, ax = plt.subplots()
+
+            plt.rcParams['figure.facecolor'] = 'white'
+            ax.scatter(input_plot[:, 0], AOS_plot[:, 0], s=16,
+                        c=np.sqrt(input_plot[:, 0] ** 2),
+                        cmap=cmap, antialiased=True,
+                        lw=lineweight, marker='o',
+                        edgecolors=edgecolors)
+
+            ax.set_xlabel('$AIS_{u}$')
+            ax.set_ylabel('$AOS_{u}$')
+
+        elif input_map.shape[-1]  == 2 and AOS.shape[-1] == 2:
 
             input_plot = input_map.reshape(np.prod(input_map.shape[0:-1]),
                                          input_map.shape[-1])
@@ -2469,16 +2485,16 @@ def exhaustive_weighted_OI_eval(
 
     if plot:
         if AIS_region.dim == 2:
-            plot_2d_region(AIS_region, DISuAIS_region, perspective='inputs')
+            _plot_2d_region(AIS_region, DISuAIS_region, perspective='inputs')
         elif AIS_region.dim == 3:
-            plot_3d_region(AIS_poly, DISuAIS_poly, perspective='inputs')
+            _plot_3d_region(AIS_poly, DISuAIS_poly, perspective='inputs')
         else:
             print(f"plotting is not supported for the AIS with {AIS_region.dim} dimensions")
 
         if AOS_region.dim == 2:
-            plot_2d_region(AOS_region, DOSuAOS_region, perspective='outputs')
-        elif AIS_region.dim == 3:
-            plot_3d_region(AOS_poly, DOSuAOS_poly, perspective='outputs')
+            _plot_2d_region(AOS_region, DOSuAOS_region, perspective='outputs')
+        elif AOS_region.dim == 3:
+            _plot_3d_region(AOS_poly, DOSuAOS_poly, perspective='outputs')
         else:
             print(f"plotting is not supported for the AIS with {AIS_region.dim} dimensions")
 
@@ -2540,51 +2556,50 @@ def region_to_list(region):
     return vertices_list
 
 
-def plot_2d_region(mapped_region, intersection, perspective):
+def _plot_2d_region(mapped_region, intersection, perspective):
+
+    plot_region = pc.Region([polytope for polytope in mapped_region.list_poly if polytope.volume != 0])
+    plot_intersection = pc.Region([polytope for polytope in intersection.list_poly if polytope.volume != 0])
 
     fig, ax = plt.subplots()
-    if len(mapped_region) == 0:
-        polyplot = _get_patch(mapped_region, linestyle="solid",
+    if len(plot_region) == 0:
+        polyplot = _get_patch(plot_region, linestyle="solid",
                                     edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
                                     facecolor=AS_COLOR)
         ax.add_patch(polyplot)
     else:
-        for i in range(len(mapped_region)):
-            polyplot = _get_patch(mapped_region[i], linestyle="solid",
+        for i in range(len(plot_region)):
+            polyplot = _get_patch(plot_region[i], linestyle="solid",
                                         edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
                                         facecolor=AS_COLOR)
             ax.add_patch(polyplot)
 
-    if len(intersection) == 0:
-        polyplot = _get_patch(intersection, linestyle="solid",
+    if len(plot_intersection) == 0:
+        polyplot = _get_patch(plot_intersection, linestyle="solid",
                                     edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
                                     facecolor=INTERSECT_COLOR)
         ax.add_patch(polyplot)
     else:
-        for i in range(len(intersection)):
-            polyplot = _get_patch(intersection[i], linestyle="solid",
+        for i in range(len(plot_intersection)):
+            polyplot = _get_patch(plot_intersection[i], linestyle="solid",
                                         edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
                                         facecolor=INTERSECT_COLOR)
             ax.add_patch(polyplot)
 
-    bounding_region = pc.Region([polytope for polytope in mapped_region.list_poly if polytope.volume != 0])
-    lower_xaxis = bounding_region.bounding_box[0][0]
-    upper_xaxis = bounding_region.bounding_box[1][0]
-    lower_yaxis = bounding_region.bounding_box[0][1]
-    upper_yaxis = bounding_region.bounding_box[1][1]
+    lower_xaxis = plot_region.bounding_box[0][0]
+    upper_xaxis = plot_region.bounding_box[1][0]
+    lower_yaxis = plot_region.bounding_box[0][1]
+    upper_yaxis = plot_region.bounding_box[1][1]
 
     ax.set_xlim(lower_xaxis - 0.05 * lower_xaxis,
                 upper_xaxis + 0.05 * upper_xaxis)
     ax.set_ylim(lower_yaxis - 0.05 * lower_yaxis,
                 upper_yaxis + 0.05 * upper_yaxis)
 
-    if perspective == 'inputs':
-        ax.set_title('Input Space')
-    if perspective == 'outputs':
-        ax.set_title('Output Space')
+    _add_plot_labels(ax, perspective)
 
 
-def plot_3d_region(mapped_region, intersection, perspective):
+def _plot_3d_region(mapped_region, intersection, perspective):
 
     fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
 
@@ -2614,55 +2629,97 @@ def plot_3d_region(mapped_region, intersection, perspective):
         ax.scatter(cube[:, 0], cube[:, 1], cube[:, 2], marker='o',
                    color='None')
 
+        _add_plot_labels(ax, perspective)
+
+
+def _add_plot_labels(ax, perspective):
+
     if perspective == 'inputs':
         ax.set_title('Input Space')
+        AS_label = 'Available Input Set (AIS)'
+        int_label = r'$ AIS \cap DIS$'
     if perspective == 'outputs':
         ax.set_title('Output Space')
+        AS_label = 'Achievable Output Set (AOS)'
+        int_label = r'$ AOS \cap DOS$'
+
+    AS_patch = mpatches.Patch(color=AS_COLOR, label=AS_label)
+    INTERSECT_patch = mpatches.Patch(color=INTERSECT_COLOR, label=int_label)
+    ax.legend(handles=[AS_patch, INTERSECT_patch])
 
 
 def append_weighting_factors(weight_model, input_set, output_set):
+    """
+    For a discretized array of vertices in shape (dim1_resolution, dim2_resolution,
+    ..., dimn_resolution, ndim), append weighting factors from a callable model and
+    reshape into (dim1_resolution, dim2_resolution,..., dimn_resolution,
+    weights, ndim+1).
+
+    Author: Hunter Barber
+
+    Control, Optimization and Design for Energy and Sustainability
+    (CODES) Group - West Virginia University - 2023
+
+    Parameters
+    ----------
+    weight_model : Callable[...,Union[float,np.ndarray]]
+        Weighting model that calculates the weights of inputs (AIS-DIS)
+    input_set : np.ndarray
+        Discretized Available Input Set (AIS).
+    output_set : np.ndarray
+        Discretized Available Output Set (AOS).
+
+    Returns
+    -------
+    input_final : np.ndarray
+        Discretized Available Input Set (AIS) with appended weighting factors.
+    output_final : np.ndarray
+        Discretized Available Output Set (AOS) with appended weighting factors.
+    """
+
     # reshape sets to a sequential array of coordinates (of length ndim)
+    # then double sequential array of coordinates to bound between zero and weight
     # inputs
     input_shape = list(input_set.shape)
     input_read = np.reshape(input_set, (np.prod(input_shape[:-1]), input_set.ndim - 1))
     input_reshape = input_shape
     input_reshape.insert(-1, 2)
     input_reshape[-1] = input_reshape[-1] + 1
+    input_newshape = list(input_read.shape)
+    input_newshape[0] = 2*input_newshape[0]
+    input_new = np.zeros(tuple(input_newshape))
     # outputs
     output_shape = list(output_set.shape)
     output_read = np.reshape(output_set, (np.prod(output_shape[:-1]), output_set.ndim - 1))
     output_reshape = output_shape
     output_reshape.insert(-1, 2)
     output_reshape[-1] = output_reshape[-1] + 1
+    output_newshape = list(output_read.shape)
+    output_newshape[0] = 2*output_newshape[0]
+    output_new = np.zeros(tuple(output_newshape))
     # weighting factors
     weight_shape = list(input_read.shape)
     weight_shape[0] = 2*weight_shape[0]
     weight_shape[-1] = 1
-    weight_set = np.zeros(tuple(weight_shape))
-    input_newshape = list(input_read.shape)
-    input_newshape[0] = 2*input_newshape[0]
-    input_new = np.zeros(tuple(input_newshape))
-    output_newshape = list(output_read.shape)
-    output_newshape[0] = 2*output_newshape[0]
-    output_new = np.zeros(tuple(output_newshape))
+    weight_new = np.zeros(tuple(weight_shape))
 
     # evaluate weighting factor model
     for i in range(len(input_read)):
-        weight_set[2*i] = weight_model(input_read[i])
+        # apply weight to every even, every odd remain zero
+        weight_new[2*i] = weight_model(input_read[i])
+        # duplicate projection of inputs and outputs
+        # inputs
         input_new[2*i] = input_read[i]
         input_new[2*i+1] = input_read[i]
+        # outputs
         output_new[2*i] = output_read[i]
         output_new[2*i+1] = output_read[i]
 
-    # reshape sets to original shape now including the weighting factors
-    # weighting factors
-    weight_new = weight_set
+    # reshape sets to polytopic shape now including the weighting factors
     # inputs
-    # input_new = np.concatenate([input_read, input_read], axis=0)
     input_final = np.concatenate([input_new, weight_new], axis=-1)
     input_final = np.reshape(input_final, tuple(input_reshape))
     # outputs
-    # output_new = np.concatenate([output_read, output_read], axis=0)
     output_final = np.concatenate([output_new, weight_new], axis=-1)
     output_final = np.reshape(output_final, tuple(output_reshape))
 
