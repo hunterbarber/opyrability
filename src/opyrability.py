@@ -1503,7 +1503,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 ax1.set_title('$AIS_{u}$')
                 ax1.set_ylabel('$u_{2}$')
             else:
-                ax1.set_title('$AIS_{u} \, and \, EDS_{d}$')
+                ax1.set_title('$AIS_{u}$ and $EDS_{d}$')
                 ax1.set_ylabel('$d_{1}$')
 
 
@@ -1542,12 +1542,12 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 ax.set_zlabel('$u_{3}$')
 
             elif EDS_bound.shape[0] == 2:
-                ax.set_title('$AIS_{u} \, and  \, EDS_{d}$')
+                ax.set_title('$AIS_{u}$ and $EDS_{d}$')
 
                 ax.set_ylabel('$d_{1}$')
                 ax.set_zlabel('$d_{2}$')
             elif EDS_bound.shape[0] == 1:
-                ax.set_title('$AIS_{u} \, and \, EDS_{d}$')
+                ax.set_title('$AIS_{u}$ and $EDS_{d}$')
                 ax.set_ylabel('$u_{2}$')
                 ax.set_zlabel('$d_{1}$')
 
@@ -1590,7 +1590,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 plt.title('$AIS_{u}$')
                 plt.ylabel('$u_{2}$')
             else:
-                plt.title('$AIS_{u} \, and \, EDS_{d}$')
+                plt.title('$AIS_{u}$ and $EDS_{d}$')
                 plt.ylabel('$d_{1}$')
 
 
@@ -1630,12 +1630,12 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 ax.set_zlabel('$u_{3}$')
 
             elif EDS_bound.shape[0] == 2:
-                ax.set_title('$AIS_{u} \, and \, EDS_{d}')
+                ax.set_title('$AIS_{u}$ and $EDS_{d}')
 
                 ax.set_ylabel('$d_{1}$')
                 ax.set_zlabel('$d_{2}$')
             elif EDS_bound.shape[0] == 1:
-                ax.set_title('$AIS_{u} \, and \, EDS_{d}$')
+                ax.set_title('$AIS_{u}$ and $EDS_{d}$')
                 ax.set_ylabel('$u_{2}$')
                 ax.set_zlabel('$d_{1}$')
 
@@ -2464,9 +2464,12 @@ def are_overlapping(poly1, poly2):
 
 # ------------------------------------------------------------------------------
 # Hunter additions for forward mapping into weighted OI eval
+# TODO: interpret DOS OI when regions are overlapping
+#       add DOS projection with weighting factors into plotting
+#       plot outputs as a discrete probability function with vlines
 
 
-def exhaustive_weighted_OI_eval(
+def weighted_multimodel_OI_eval(
         process_model: Callable[..., Union[float, np.ndarray]],
         weighting_model: Callable[..., Union[float, np.ndarray]],
         AIS_bounds: np.ndarray,
@@ -2510,7 +2513,7 @@ def exhaustive_weighted_OI_eval(
 
 
 def interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds):
-    # TODO: interpret overlapping regions which are weighted
+
     DS_poly = pc.box2poly(DOS_bounds)
 
     DISuAIS, DOSuAOS = list(), list()
@@ -2562,24 +2565,13 @@ def _plot_2d_region(mapped_region, intersection, perspective):
     plot_intersection = pc.Region([polytope for polytope in intersection.list_poly if polytope.volume != 0])
 
     fig, ax = plt.subplots()
-    if len(plot_region) == 0:
-        polyplot = _get_patch(plot_region, linestyle="solid",
+    for i in range(len(plot_region)):
+        polyplot = _get_patch(plot_region[i], linestyle="solid",
                                     edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
                                     facecolor=AS_COLOR)
         ax.add_patch(polyplot)
-    else:
-        for i in range(len(plot_region)):
-            polyplot = _get_patch(plot_region[i], linestyle="solid",
-                                        edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
-                                        facecolor=AS_COLOR)
-            ax.add_patch(polyplot)
 
-    if len(plot_intersection) == 0:
-        polyplot = _get_patch(plot_intersection, linestyle="solid",
-                                    edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
-                                    facecolor=INTERSECT_COLOR)
-        ax.add_patch(polyplot)
-    else:
+    if plot_intersection.volume != 0:
         for i in range(len(plot_intersection)):
             polyplot = _get_patch(plot_intersection[i], linestyle="solid",
                                         edgecolor=EDGES_COLORS, linewidth=EDGES_WIDTH,
