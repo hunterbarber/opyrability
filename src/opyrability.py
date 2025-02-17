@@ -1334,7 +1334,7 @@ def create_grid(region_bounds: np.ndarray, region_resolution: np.ndarray):
 
 def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
                 AIS_bound: np.ndarray,
-                AIS_resolution: np.ndarray,
+                AIS_resolution: list,
                 EDS_bound: np.ndarray = None,
                 EDS_resolution: np.ndarray = None,
                 plot: bool = True)-> Union[np.ndarray,np.ndarray]:
@@ -1424,6 +1424,7 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
     nOutput = y_slack.shape[0]
     input_map = np.zeros(map_resolution + [nInput_map])
     AOS = np.zeros(map_resolution + [nOutput])
+    print(f"\npreallocation completed")
 
 
     # General map (AIS+EDS) multidimensional array
@@ -1438,7 +1439,11 @@ def AIS2AOS_map(model: Callable[...,Union[float,np.ndarray]],
             map_val.append(Input_map[j][inputID[j]])
 
         input_map[tuple(inputID)] = map_val
-        AOS[tuple(inputID)] = model(map_val)
+        if i == 0:
+            AOS[tuple(inputID)] = y_slack
+        else:
+            AOS[tuple(inputID)] = model(map_val)
+        print(f"\niteration {i+1}/{numInput_map} completed")
 
     # EDS multidimensional array.
     if (type(EDS_bound) and type(EDS_resolution)) is not type(None):
@@ -1511,7 +1516,7 @@ def _AIS2AOS_plot(input_map, AOS, EDS_bound, EDS_resolution):
             ax1.set_title('$AIS_{u}$')
             ax1.set_ylabel('$u_{2}$')
         else:
-            ax1.set_title('$AIS_{u} \, and \, EDS_{d}$')
+            ax1.set_title('$AIS_{u} and EDS_{d}$')
             ax1.set_ylabel('$d_{1}$')
 
         ax2.scatter(AOS_plot[:, 0], np.array([np.zeros(AOS_plot[:, 0].size), ]).T, s=16,
@@ -1695,7 +1700,7 @@ def AIS2AOS_map_reconciled(
         model,
         solve: Callable[...,Union[float,np.ndarray]],
         AIS_bound: np.ndarray,
-        AIS_resolution: np.ndarray,
+        AIS_resolution: list,
         EDS_bound: np.ndarray = None,
         EDS_resolution: np.ndarray = None,
         plot: bool = True)-> Union[np.ndarray, np.ndarray]:
@@ -1787,7 +1792,6 @@ def AIS2AOS_map_reconciled(
     input_map = np.zeros(map_resolution + [nInput_map])
     AOS = np.zeros(map_resolution + [nOutput])
 
-
     # General map (AIS+EDS) multidimensional array
     for i in range(numInput_map):
         inputID = [0]*nInput_map
@@ -1800,7 +1804,10 @@ def AIS2AOS_map_reconciled(
             map_val.append(Input_map[j][inputID[j]])
 
         input_map[tuple(inputID)] = map_val
-        out = solve(m, map_val)
+        if i == 0:
+            out = y_slack
+        else:
+            out = solve(m, map_val)
         AOS[tuple(inputID)] = [v-1e-8*i for v in out]
 
 
@@ -1942,8 +1949,11 @@ def points2simplices(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
     return AIS_simplices, AOS_simplices
 
 
-def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
-                                                                np.ndarray]:
+def points2polyhedra(
+        AIS: Union[np.ndarray, np.ndarray],
+        AOS: Union[np.ndarray, np.ndarray],
+        numerical_tolerance: float=1e-8,
+):
     '''
     Generation of connected polyhedra based on the AIS/AOS points.
 
@@ -2011,15 +2021,43 @@ def points2polyhedra(AIS: np.ndarray, AOS: np.ndarray) -> Union[np.ndarray,
             AIS_polytope.append(V_AIS_id)
 
 
+    if nInput == 2:
+        # hard coding for 2D polyhedron
+        tolerance_matrix = [
+            [-1, -1],
+            [-1,  1],
+            [ 1, -1],
+            [ 1,  1],
+        ]
+    if nInput == 3:
+        # hard coding for 3D polyhedron
+        tolerance_matrix = [
+            [-1, -1,  1],
+            [-1, -1, -1],
+            [-1,  1,  1],
+            [-1,  1, -1],
+            [ 1, -1,  1],
+            [ 1, -1, -1],
+            [ 1,  1,  1],
+            [ 1,  1, -1],
+        ]
+
     # Putting polytopes together.
-    for i, simplex in enumerate(AOS_polytope):
-        poly = pc.qhull(simplex.T)
+    for i, polytope in enumerate(AOS_polytope):
+        shape = polytope.T
+        for j, vertex in enumerate(shape):
+            for k, dim in enumerate(vertex):
+                shape[j][k] += tolerance_matrix[j][k] * numerical_tolerance
+        poly = pc.qhull(shape)
         AOS_polytope[i] = pc.extreme(poly)
 
-    for i, simplex in enumerate(AIS_polytope):
-        poly = pc.qhull(simplex.T)
+    for i, polytope in enumerate(AIS_polytope):
+        shape = polytope.T
+        for j, vertex in enumerate(shape):
+            for k, dim in enumerate(vertex):
+                shape[j][k] += tolerance_matrix[j][k] * numerical_tolerance
+        poly = pc.qhull(shape)
         AIS_polytope[i] = pc.extreme(poly)
-
 
     return AIS_polytope, AOS_polytope
 
@@ -2639,7 +2677,6 @@ def are_overlapping(poly1, poly2):
 
 def weighted_multimodel_OI_eval(
         process_model,
-        solve_model: Callable[..., Union[float, np.ndarray]],
         weighting_model: Callable[..., Union[float, np.ndarray]],
         AIS_bounds: np.ndarray,
         AIS_resolution: list,
@@ -2648,11 +2685,16 @@ def weighted_multimodel_OI_eval(
         plot: bool = True,
 ):
 
-    AIS, AOS = AIS2AOS_map_reconciled(process_model, solve_model, AIS_bounds, AIS_resolution, plot=plot)
+    numerical_tolerance = 1e-8
+    # for i, row in enumerate(DOS_bounds):
+    #     DOS_bounds[i][0] =+ numerical_tolerance
+    #     DOS_bounds[i][1] =- numerical_tolerance
+
+    AIS, AOS = AIS2AOS_map(process_model, AIS_bounds, AIS_resolution, plot=plot)
     AIS, AOS = append_weighting_factors(weighting_model, AIS, AOS)
-    AIS_poly, AOS_poly = points2polyhedra(AIS, AOS)
+    AIS_poly, AOS_poly = points2polyhedra(AIS, AOS, numerical_tolerance)
     AIS_region, AOS_region = list_to_region(AIS_poly), list_to_region(AOS_poly)
-    DISuAIS_region, DOSuAOS_region = interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds)
+    DISuAIS_region, DOSuAOS_region = interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds, numerical_tolerance)
     DISuAIS_poly, DOSuAOS_poly = region_to_list(DISuAIS_region), region_to_list(DOSuAOS_region)
 
     if plot:
@@ -2681,34 +2723,48 @@ def weighted_multimodel_OI_eval(
     return OI
 
 
-def interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds):
+def interpret_mapped_intersection(AIS_region, AOS_region, DOS_bounds, numerical_tolerance=1e-8):
 
     DS_poly = pc.box2poly(DOS_bounds)
 
-    DISuAIS, DOSuAOS = list(), list()
-    float_tol = 1e-6
+    DISuAIS_poly, DOSuAOS_poly = list(), list()
     for AI_poly_weighted, AO_poly_weighted in zip(AIS_region, AOS_region):
 
-        # project polytope into ndim-1 to not include weighting factors
-        AO_poly = pc.projection(AO_poly_weighted, list(range(1, AOS_region[0].dim)))
+        # output solutions have multiplicites
+        # check if overlapping vertices are within DOS
+        # vertices_check = [vertices[0:-1] for vertices in AO_poly_weighted.vertices]
+        #
+        # # output solutions have multiplicites
+        # count = 0
+        # for vertices in vertices_check:
+        #     for dim, value in enumerate(vertices):
+        #         # check if overlapping vertices are within DOS
+        #         if DOS_bounds[dim][0]-numerical_tolerance <= value <= DOS_bounds[dim][1]+numerical_tolerance:
+        #             count += 1
+        #
+        # if count == len(vertices_check):
+        #     DISuAIS_poly.append(AI_poly_weighted), DOSuAOS_poly.append(AO_poly_weighted)
 
-        if AO_poly.volume == 0:
-            # output solutions have multiplicites
-            # check if overlapping vertices are within DOS
-            vertices_check = [vertices[0:-1] for vertices in AO_poly_weighted.vertices]
-            if all(
-                    all(
-                        (DOS_bounds[dim][0]-(DOS_bounds[dim][0]*float_tol)) <= value <= (DOS_bounds[dim][1]+(DOS_bounds[dim][1]*float_tol))
-                        for dim, value in enumerate(coord)
-                    ) for coord in vertices_check
-            ):
-                DISuAIS.append(AI_poly_weighted), DOSuAOS.append(AO_poly_weighted)
+
+        vertices_list = []
+        for ind, vertices in enumerate(AO_poly_weighted.vertices):
+            if ind % 2 == 0:
+                vertices_list.append(vertices[0:-1])
+
+        AO_poly = AO_poly_weighted.project(list(range(1, AO_poly_weighted.dim)))
+        ao_volume = AO_poly.volume
+        intersect_volume = pc.intersect(AO_poly, DS_poly).volume
+
+        if len([vertex for vertex in vertices_list
+                if all(DOS_bounds[dim][0]-numerical_tolerance <= value <= DOS_bounds[dim][1]+numerical_tolerance
+                       for dim, value in enumerate(vertex))]) == len(vertices_list):
+            DISuAIS_poly.append(AI_poly_weighted), DOSuAOS_poly.append(AO_poly_weighted)
+        elif ao_volume > 0 and intersect_volume >= 0.50 * ao_volume:
+            DISuAIS_poly.append(AI_poly_weighted), DOSuAOS_poly.append(AO_poly_weighted)
         else:
-            # check if polytope regions are at least 50% contained within the DOS
-            if pc.intersect(AO_poly, DS_poly).volume / (AO_poly.volume+1e-8) >= 0.50:
-                DISuAIS.append(AI_poly_weighted), DOSuAOS.append(AO_poly_weighted)
+            continue
 
-    return pc.Region(DISuAIS), pc.Region(DOSuAOS)
+    return pc.Region(DISuAIS_poly), pc.Region(DOSuAOS_poly)
 
 
 def list_to_region(vertices_list):
@@ -2816,6 +2872,10 @@ def _plot_3d_region(mapped_region, intersection, perspective):
                 upper_zaxis + 0.1 * zrange)
 
     _add_plot_labels(ax, perspective)
+    # ax.view_init(90, -90, 0)
+    # zticks = np.arange(lower_zaxis, upper_zaxis+1, 3)
+    # empty_labels_z = ["" for i in range(len(zticks))]
+    # ax.set_zticks(zticks, empty_labels_z)
 
 
 def _add_plot_labels(ax, perspective):
@@ -2834,7 +2894,7 @@ def _add_plot_labels(ax, perspective):
     ax.legend(handles=[AS_patch, INTERSECT_patch])
 
 
-def append_weighting_factors(weight_model, input_set, output_set):
+def append_weighting_factors(weight_model, input_set, output_set, numerical_tolerance=1e-8):
     """
     For a discretized array of vertices in shape (dim1_resolution, dim2_resolution,
     ..., dimn_resolution, ndim), append weighting factors from a callable model and
@@ -2893,7 +2953,7 @@ def append_weighting_factors(weight_model, input_set, output_set):
     # evaluate weighting factor model
     for i in range(len(input_read)):
         # apply weight to every even, every odd remain zero
-        weight_new[2*i] = weight_model(input_read[i])
+        weight_new[2*i] = weight_model(input_read[i]) + numerical_tolerance
         # duplicate projection of inputs and outputs
         # inputs
         input_new[2*i] = input_read[i]
